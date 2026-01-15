@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 id="tripName">Loading...</h1>
+      <div id="settledBadge" class="settled-badge" style="display: none;">
+        ✓ SETTLED
+      </div>
+    </div>
+
+    <!-- Members Summary -->
+    <div class="card">
+      <h3>Members</h3>
+      <div id="membersSummary" class="members-summary"></div>
+    </div>
+
+    <!-- Add Expense Form -->
+    <div class="card" id="addExpenseCard">
+      <h3>Add Expense</h3>
+      
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="expenseDesc" placeholder="e.g., Lunch at cafe" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="expenseAmount" placeholder="500" step="0.01" />
+        </div>
+
+        <div class="form-group">
+          <label>Category</label>
+          <select id="expenseCategory">
+            <option value="food">Food</option>
+            <option value="stay">Stay</option>
+            <option value="transport">Transport</option>
+            <option value="water">Water</option>
+            <option value="activities">Activities</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Paid By</label>
+        <select id="expensePayer"></select>
+      </div>
+
+      <div class="form-group">
+        <label>Split Between</label>
+        <div id="participantsList" class="checkbox-list"></div>
+      </div>
+
+      <button onclick="addExpense()" class="btn-primary">Add Expense</button>
+    </div>
+
+    <!-- Expenses Feed -->
+    <div class="card">
+      <h3>Expenses</h3>
+      <div id="expensesFeed" class="expenses-feed">
+        <p class="empty-state">No expenses yet</p>
+      </div>
+    </div>
+
+    <!-- Settlement Section -->
+    <div class="card settlement-card">
+      <button onclick="showSettlement()" class="btn-settlement" id="calculateBtn">
+        Calculate Settlement
+      </button>
+      
+      <div id="settlementResult" style="display: none;">
+        <h3>Member Balances</h3>
+        <div id="balancesView" class="balances-view"></div>
+
+        <h3>Final Settlement</h3>
+        <div id="settlementsView" class="settlements-view"></div>
+
+        <button onclick="settleTrip()" class="btn-danger" id="settleBtn">
+          End Trip & Lock Settlement
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tripId;
+    let members = [];
+    let expenses = [];
+    let isSettled = false;
+
+    // Get trip ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    tripId = urlParams.get('id');
+
+    if (!tripId) {
+      alert('Invalid trip ID');
+      window.location.href = '/';
+    }
+
+    // Load trip data
+    async function loadTrip() {
+      try {
+        const response = await fetch(`/api/trips/${tripId}`);
+        const data = await response.json();
+
+        document.getElementById('tripName').textContent = data.trip.name;
+        members = data.members;
+        isSettled = data.trip.is_settled === 1;
+
+        if (isSettled) {
+          document.getElementById('settledBadge').style.display = 'inline-block';
+          document.getElementById('addExpenseCard').style.display = 'none';
+          document.getElementById('calculateBtn').style.display = 'none';
+          showSettlement();
+        }
+
+        renderMembersSummary();
+        populatePayerDropdown();
+        populateParticipants();
+        loadExpenses();
+      } catch (err) {
+        alert('Failed to load trip');
+      }
+    }
+
+    function renderMembersSummary() {
+      const html = members.map(m => `<span class="member-tag">${m.name}</span>`).join('');
+      document.getElementById('membersSummary').innerHTML = html;
+    }
+
+    function populatePayerDropdown() {
+      const select = document.getElementById('expensePayer');
+      select.innerHTML = members.map(m => 
+        `<option value="${m.id}">${m.name}</option>`
+      ).join('');
+    }
+
+    function populateParticipants() {
+      const html = members.map(m => `
+        <label class="checkbox-label">
+          <input type="checkbox" value="${m.id}" checked />
+          <span>${m.name}</span>
+        </label>
+      `).join('');
+      document.getElementById('participantsList').innerHTML = html;
+    }
+
+    async function addExpense() {
+      const description = document.getElementById('expenseDesc').value.trim();
+      const amount = parseFloat(document.getElementById('expenseAmount').value);
+      const payerId = parseInt(document.getElementById('expensePayer').value);
+      const category = document.getElementById('expenseCategory').value;
+
+      const participantCheckboxes = document.querySelectorAll('#participantsList input[type="checkbox"]:checked');
+      const participantIds = Array.from(participantCheckboxes).map(cb => parseInt(cb.value));
+
+      if (!description || !amount || participantIds.length === 0) {
+        alert('Please fill all fields and select at least one participant');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId,
+            description,
+            amount,
+            payerId,
+            category,
+            participantIds
+          })
+        });
+
+        if (response.ok) {
+          document.getElementById('expenseDesc').value = '';
+          document.getElementById('expenseAmount').value = '';
+          loadExpenses();
+        } else {
+          const data = await response.json();
+          alert(data.error || 'Failed to add expense');
+        }
+      } catch (err) {
+        alert('Network error');
+      }
+    }
+
+    async function loadExpenses() {
+      try {
+        const response = await fetch(`/api/trips/${tripId}/expenses`);
+        expenses = await response.json();
+        renderExpenses();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderExpenses() {
+      const feed = document.getElementById('expensesFeed');
+      
+      if (expenses.length === 0) {
+        feed.innerHTML = '<p class="empty-state">No expenses yet</p>';
+        return;
+      }
+
+      const html = expenses.map(exp => {
+        const participantNames = exp.participants.map(p => p.name).join(', ');
+        const categoryEmoji = {
+          food: '🍽️',
+          stay: '🏨',
+          transport: '🚗',
+          water: '💧',
+          activities: '🎯'
+        }[exp.category] || '💰';
+
+        return `
+          <div class="expense-item">
+            <div class="expense-header">
+              <span class="expense-category">${categoryEmoji} ${exp.category}</span>
+              <span class="expense-amount">₹${exp.amount.toFixed(2)}</span>
+            </div>
+            <div class="expense-description">${exp.description}</div>
+            <div class="expense-meta">
+              Paid by <strong>${exp.payer_name}</strong> • Split between: ${participantNames}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      feed.innerHTML = html;
+    }
+
+    async function showSettlement() {
+      try {
+        const response = await fetch(`/api/trips/${tripId}/calculate`);
+        const data = await response.json();
+
+        // Show balances
+        const balancesHtml = data.memberStats.map(stat => {
+          const balanceClass = stat.balance > 0 ? 'positive' : stat.balance < 0 ? 'negative' : 'neutral';
+          const balanceText = stat.balance > 0 
+            ? `Will receive ₹${stat.balance.toFixed(2)}`
+            : stat.balance < 0 
+            ? `Owes ₹${Math.abs(stat.balance).toFixed(2)}`
+            : 'Settled';
+
+          return `
+            <div class="balance-item">
+              <div class="balance-name">${stat.name}</div>
+              <div class="balance-stats">
+                <span>Paid: ₹${stat.paid.toFixed(2)}</span>
+                <span>Owed: ₹${stat.owed.toFixed(2)}</span>
+              </div>
+              <div class="balance-result ${balanceClass}">${balanceText}</div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('balancesView').innerHTML = balancesHtml;
+
+        // Show settlements
+        if (data.settlements.length === 0) {
+          document.getElementById('settlementsView').innerHTML = 
+            '<p class="empty-state">All settled! No payments needed.</p>';
+        } else {
+          const settlementsHtml = data.settlements.map(s => `
+            <div class="settlement-item">
+              <div class="settlement-arrow">
+                <span class="from-user">${s.from}</span>
+                <span class="arrow">→</span>
+                <span class="to-user">${s.to}</span>
+              </div>
+              <div class="settlement-amount">₹${s.amount.toFixed(2)}</div>
+            </div>
+          `).join('');
+
+          document.getElementById('settlementsView').innerHTML = settlementsHtml;
+        }
+
+        document.getElementById('settlementResult').style.display = 'block';
+        
+        if (isSettled) {
+          document.getElementById('settleBtn').style.display = 'none';
+        }
+      } catch (err) {
+        alert('Failed to calculate settlement');
+      }
+    }
+
+    async function settleTrip() {
+      if (!confirm('This will lock the trip and prevent adding new expenses. Continue?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/trips/${tripId}/settle`, {
+          method: 'POST'
+        });
+
+        if (response.ok) {
+          alert('Trip settled successfully!');
+          location.reload();
+        }
+      } catch (err) {
+        alert('Failed to settle trip');
+      }
+    }
+
+    // Initialize
+    loadTrip();
+  </script>
+</body>
+</html>

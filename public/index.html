@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💰 Trip Expense Tracker</h1>
+      <p class="subtitle">Split expenses fairly, settle up easily</p>
+    </div>
+
+    <div class="card">
+      <h2>Create New Trip</h2>
+      
+      <div class="form-group">
+        <label>Trip Name</label>
+        <input type="text" id="tripName" placeholder="e.g., Goa Trip 2026" />
+      </div>
+
+      <div class="form-group">
+        <label>Add Members (minimum 2)</label>
+        <div id="membersList" class="members-list"></div>
+        <div class="member-input-row">
+          <input type="text" id="memberInput" placeholder="Enter member name" />
+          <button onclick="addMember()" class="btn-secondary">+ Add</button>
+        </div>
+      </div>
+
+      <button onclick="createTrip()" class="btn-primary" id="createBtn">Create Trip</button>
+    </div>
+  </div>
+
+  <script>
+    const members = [];
+
+    function addMember() {
+      const input = document.getElementById('memberInput');
+      const name = input.value.trim();
+
+      if (!name) {
+        alert('Please enter a member name');
+        return;
+      }
+
+      if (members.includes(name)) {
+        alert('Member already added');
+        return;
+      }
+
+      members.push(name);
+      input.value = '';
+      renderMembers();
+    }
+
+    function removeMember(name) {
+      const index = members.indexOf(name);
+      if (index > -1) {
+        members.splice(index, 1);
+        renderMembers();
+      }
+    }
+
+    function renderMembers() {
+      const list = document.getElementById('membersList');
+      if (members.length === 0) {
+        list.innerHTML = '<p class="empty-state">No members added yet</p>';
+        return;
+      }
+
+      list.innerHTML = members.map(name => `
+        <div class="member-tag">
+          <span>${name}</span>
+          <button onclick="removeMember('${name}')" class="remove-btn">×</button>
+        </div>
+      `).join('');
+    }
+
+    async function createTrip() {
+      const tripName = document.getElementById('tripName').value.trim();
+
+      if (!tripName) {
+        alert('Please enter a trip name');
+        return;
+      }
+
+      if (members.length < 2) {
+        alert('Please add at least 2 members');
+        return;
+      }
+
+      document.getElementById('createBtn').disabled = true;
+      document.getElementById('createBtn').textContent = 'Creating...';
+
+      try {
+        const response = await fetch('/api/trips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: tripName, members })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          window.location.href = `/trip.html?id=${data.tripId}`;
+        } else {
+          alert(data.error || 'Failed to create trip');
+          document.getElementById('createBtn').disabled = false;
+          document.getElementById('createBtn').textContent = 'Create Trip';
+        }
+      } catch (err) {
+        alert('Network error. Please try again.');
+        document.getElementById('createBtn').disabled = false;
+        document.getElementById('createBtn').textContent = 'Create Trip';
+      }
+    }
+
+    // Allow Enter key on member input
+    document.getElementById('memberInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addMember();
+    });
+
+    // Initialize
+    renderMembers();
+  </script>
+</body>
+</html>
