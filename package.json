@@ -1,0 +1,17 @@
+{
+  "name": "trip-expense-tracker",
+  "version": "1.0.0",
+  "description": "Minimal MVP for group trip expense tracking and settlement",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["expense", "trip", "settlement", "splitwise"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  }
+}
