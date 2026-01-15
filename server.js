@@ -4,7 +4,7 @@ const { initDatabase, runQuery, getQuery, allQuery } = require('./db');
 const { calculateSettlement, formatSettlement } = require('./settlement');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
@@ -12,6 +12,11 @@ app.use(express.static('public'));
 
 // Initialize database
 initDatabase();
+
+// Health check endpoint for Vercel
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running' });
+});
 
 // ============ API ROUTES ============
 
