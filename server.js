@@ -18,6 +18,16 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
+// Root redirect to index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve trip page
+app.get('/trip.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'trip.html'));
+});
+
 // ============ API ROUTES ============
 
 // Create a new trip
