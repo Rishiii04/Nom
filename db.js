@@ -1,8 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'expenses.db');
-const db = new sqlite3.Database(DB_PATH);
+// Use in-memory database for Vercel (serverless compatible)
+const db = new sqlite3.Database(':memory:');
 
 // Initialize database schema
 function initDatabase() {
@@ -55,7 +54,7 @@ function initDatabase() {
       )
     `);
 
-    console.log('✓ Database initialized');
+    console.log('✓ Database initialized (in-memory for Vercel)');
   });
 }
 
