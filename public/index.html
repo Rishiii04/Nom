@@ -7,6 +7,22 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <div class="navbar-left">
+        <a href="profile.html" class="nav-link">Profile</a>
+        <a href="explore.html" class="nav-link">Explore</a>
+      </div>
+      <div class="navbar-center">
+        <a href="/" class="btn-start-trip">🚀 Start Trip</a>
+      </div>
+      <div class="navbar-right">
+        <a href="trips.html" class="nav-link">My Trips</a>
+      </div>
+    </div>
+  </nav>
+
   <div class="container">
     <div class="header">
       <h1>💰 Trip Expense Tracker</h1>
@@ -24,8 +40,9 @@
       <div class="form-group">
         <label>Add Members (minimum 2)</label>
         <div id="membersList" class="members-list"></div>
-        <div class="member-input-row">
-          <input type="text" id="memberInput" placeholder="Enter member name" />
+        <div class="member-input-container">
+          <input type="text" id="memberInput" placeholder="Name" />
+          <input type="text" id="upiInput" placeholder="UPI ID (optional)" />
           <button onclick="addMember()" class="btn-secondary">+ Add</button>
         </div>
       </div>
@@ -38,26 +55,29 @@
     const members = [];
 
     function addMember() {
-      const input = document.getElementById('memberInput');
-      const name = input.value.trim();
+      const nameInput = document.getElementById('memberInput');
+      const upiInput = document.getElementById('upiInput');
+      const name = nameInput.value.trim();
+      const upiId = upiInput.value.trim();
 
       if (!name) {
         alert('Please enter a member name');
         return;
       }
 
-      if (members.includes(name)) {
+      if (members.some(m => m.name === name)) {
         alert('Member already added');
         return;
       }
 
-      members.push(name);
-      input.value = '';
+      members.push({ name, upiId: upiId || null });
+      nameInput.value = '';
+      upiInput.value = '';
       renderMembers();
     }
 
     function removeMember(name) {
-      const index = members.indexOf(name);
+      const index = members.findIndex(m => m.name === name);
       if (index > -1) {
         members.splice(index, 1);
         renderMembers();
@@ -71,10 +91,13 @@
         return;
       }
 
-      list.innerHTML = members.map(name => `
+      list.innerHTML = members.map(member => `
         <div class="member-tag">
-          <span>${name}</span>
-          <button onclick="removeMember('${name}')" class="remove-btn">×</button>
+          <div class="member-info">
+            <span class="member-name">${member.name}</span>
+            ${member.upiId ? `<span class="member-upi">💳 ${member.upiId}</span>` : '<span class="member-upi-missing">No UPI</span>'}
+          </div>
+          <button onclick="removeMember('${member.name}')" class="remove-btn">×</button>
         </div>
       `).join('');
     }
@@ -120,6 +143,10 @@
 
     // Allow Enter key on member input
     document.getElementById('memberInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addMember();
+    });
+    
+    document.getElementById('upiInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') addMember();
     });
 
