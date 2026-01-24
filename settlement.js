@@ -79,28 +79,44 @@ function calculateSettlement(expenses, members) {
 }
 
 /**
+ * Get member by ID
+ */
+function getMember(members, memberId) {
+  return members.find(m => m.id === memberId);
+}
+
+/**
  * Get member name by ID
  */
 function getMemberName(members, memberId) {
-  const member = members.find(m => m.id === memberId);
+  const member = getMember(members, memberId);
   return member ? member.name : `User ${memberId}`;
 }
 
 /**
- * Format settlement for display
+ * Format settlement for display with UPI support
  */
 function formatSettlement(settlements, members) {
-  return settlements.map(s => ({
-    from: getMemberName(members, s.from),
-    to: getMemberName(members, s.to),
-    amount: s.amount,
-    fromId: s.from,
-    toId: s.to
-  }));
+  return settlements.map(s => {
+    const fromMember = getMember(members, s.from);
+    const toMember = getMember(members, s.to);
+    
+    return {
+      from: fromMember ? fromMember.name : `User ${s.from}`,
+      to: toMember ? toMember.name : `User ${s.to}`,
+      amount: s.amount,
+      fromId: s.from,
+      toId: s.to,
+      // UPI data for receiver
+      toUpiId: toMember ? toMember.upi_id : null,
+      fromUpiId: fromMember ? fromMember.upi_id : null
+    };
+  });
 }
 
 module.exports = {
   calculateSettlement,
   getMemberName,
+  getMember,
   formatSettlement
 };
