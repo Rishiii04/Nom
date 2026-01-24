@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Trips - Trip Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <div class="navbar-left">
+        <a href="profile.html" class="nav-link">Profile</a>
+        <a href="explore.html" class="nav-link">Explore</a>
+      </div>
+      <div class="navbar-center">
+        <a href="/" class="btn-start-trip">🚀 Start Trip</a>
+      </div>
+      <div class="navbar-right">
+        <a href="trips.html" class="nav-link">My Trips</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>✈️ My Trips</h1>
+      <p class="subtitle">All your travel adventures in one place</p>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="card">
+      <div class="filter-tabs">
+        <button onclick="filterTrips('all')" class="filter-tab active" data-filter="all">
+          🌍 All Trips
+        </button>
+        <button onclick="filterTrips('active')" class="filter-tab" data-filter="active">
+          🔥 Active
+        </button>
+        <button onclick="filterTrips('settled')" class="filter-tab" data-filter="settled">
+          ✅ Settled
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="card">
+      <div class="search-bar">
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="🔍 Search trips by name, location, or members..." 
+          onkeyup="searchTrips()"
+        />
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingTrips" class="card" style="display: none;">
+      <div class="loading-animation">
+        <div class="spinner"></div>
+        <p>Loading your trips...</p>
+      </div>
+    </div>
+
+    <!-- Trips Grid -->
+    <div id="tripsGrid" class="trips-grid"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="card" style="display: none;">
+      <div class="empty-state-large">
+        <div class="empty-icon">✈️</div>
+        <h3>No trips yet</h3>
+        <p>Start your first adventure by creating a new trip!</p>
+        <a href="/" class="btn-primary" style="display: inline-block; margin-top: 20px; text-decoration: none;">
+          Create Your First Trip
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allTrips = [];
+    let currentFilter = 'all';
+
+    async function loadTrips() {
+      showLoading(true);
+      
+      try {
+        const response = await fetch('/api/trips/all');
+        if (response.ok) {
+          allTrips = await response.json();
+        } else {
+          // Fallback to mock data if backend not available
+          allTrips = getMockTrips();
+        }
+      } catch (err) {
+        // Use mock data if server not running
+        allTrips = getMockTrips();
+      }
+      
+      showLoading(false);
+      renderTrips();
+    }
+
+    function getMockTrips() {
+      // Mock data for demonstration
+      return [
+        {
+          id: 1,
+          name: 'Goa Beach Trip',
+          created_at: '2024-12-15',
+          is_settled: 0,
+          member_count: 4,
+          total_expenses: 15420,
+          expense_count: 12
+        },
+        {
+          id: 2,
+          name: 'Manali Adventure',
+          created_at: '2024-11-20',
+          is_settled: 1,
+          member_count: 5,
+          total_expenses: 28500,
+          expense_count: 18
+        },
+        {
+          id: 3,
+          name: 'Weekend Getaway - Mussoorie',
+          created_at: '2024-10-05',
+          is_settled: 1,
+          member_count: 3,
+          total_expenses: 8900,
+          expense_count: 8
+        }
+      ];
+    }
+
+    function filterTrips(filter) {
+      currentFilter = filter;
+      
+      // Update active tab
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.filter === filter) {
+          tab.classList.add('active');
+        }
+      });
+      
+      renderTrips();
+    }
+
+    function searchTrips() {
+      renderTrips();
+    }
+
+    function renderTrips() {
+      const grid = document.getElementById('tripsGrid');
+      const emptyState = document.getElementById('emptyState');
+      const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+      
+      // Filter trips
+      let filteredTrips = allTrips.filter(trip => {
+        const matchesFilter = 
+          currentFilter === 'all' ||
+          (currentFilter === 'active' && trip.is_settled === 0) ||
+          (currentFilter === 'settled' && trip.is_settled === 1);
+        
+        const matchesSearch = !searchQuery || 
+          trip.name.toLowerCase().includes(searchQuery);
+        
+        return matchesFilter && matchesSearch;
+      });
+      
+      if (filteredTrips.length === 0) {
+        grid.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+      }
+      
+      grid.style.display = 'grid';
+      emptyState.style.display = 'none';
+      
+      grid.innerHTML = filteredTrips.map(trip => {
+        const statusBadge = trip.is_settled 
+          ? '<span class="trip-status settled">✓ Settled</span>'
+          : '<span class="trip-status active">🔥 Active</span>';
+        
+        const date = new Date(trip.created_at).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+
+        return `
+          <div class="trip-card" onclick="openTrip(${trip.id})">
+            <div class="trip-card-header">
+              <h3 class="trip-card-title">${trip.name}</h3>
+              ${statusBadge}
+            </div>
+            
+            <div class="trip-card-meta">
+              <div class="trip-meta-item">
+                <span class="trip-meta-icon">📅</span>
+                <span>${date}</span>
+              </div>
+              <div class="trip-meta-item">
+                <span class="trip-meta-icon">👥</span>
+                <span>${trip.member_count} members</span>
+              </div>
+            </div>
+
+            <div class="trip-card-stats">
+              <div class="trip-stat">
+                <div class="trip-stat-value">₹${trip.total_expenses.toLocaleString('en-IN')}</div>
+                <div class="trip-stat-label">Total Expenses</div>
+              </div>
+              <div class="trip-stat">
+                <div class="trip-stat-value">${trip.expense_count}</div>
+                <div class="trip-stat-label">Transactions</div>
+              </div>
+            </div>
+
+            <div class="trip-card-footer">
+              <button class="btn-view-trip">
+                View Details →
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openTrip(tripId) {
+      window.location.href = `/trip.html?id=${tripId}`;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingTrips').style.display = show ? 'block' : 'none';
+    }
+
+    // Initialize
+    loadTrips();
+  </script>
+</body>
+</html>

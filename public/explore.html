@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explore Nearby - Trip Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <div class="navbar-left">
+        <a href="profile.html" class="nav-link">Profile</a>
+        <a href="explore.html" class="nav-link">Explore</a>
+      </div>
+      <div class="navbar-center">
+        <a href="/" class="btn-start-trip">🚀 Start Trip</a>
+      </div>
+      <div class="navbar-right">
+        <a href="trips.html" class="nav-link">My Trips</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>🗺️ Explore Nearby</h1>
+      <p class="subtitle">Discover amazing places around you</p>
+    </div>
+
+    <!-- Location Info -->
+    <div class="card">
+      <div class="location-info">
+        <div class="location-icon">📍</div>
+        <div>
+          <h3 id="locationName">Detecting location...</h3>
+          <p id="locationDetails" class="text-muted"></p>
+        </div>
+        <button onclick="refreshLocation()" class="btn-refresh" title="Refresh">🔄</button>
+      </div>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="card">
+      <h3>What are you looking for?</h3>
+      <div class="category-filter">
+        <button onclick="filterCategory('all')" class="category-btn active" data-category="all">
+          🌟 All
+        </button>
+        <button onclick="filterCategory('restaurant')" class="category-btn" data-category="restaurant">
+          🍽️ Food
+        </button>
+        <button onclick="filterCategory('tourist_attraction')" class="category-btn" data-category="tourist_attraction">
+          🏛️ Attractions
+        </button>
+        <button onclick="filterCategory('park')" class="category-btn" data-category="park">
+          🌳 Parks
+        </button>
+        <button onclick="filterCategory('cafe')" class="category-btn" data-category="cafe">
+          ☕ Cafes
+        </button>
+        <button onclick="filterCategory('shopping_mall')" class="category-btn" data-category="shopping_mall">
+          🛍️ Shopping
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="card" style="display: none;">
+      <div class="loading-animation">
+        <div class="spinner"></div>
+        <p>Finding awesome places nearby...</p>
+      </div>
+    </div>
+
+    <!-- Places Grid -->
+    <div id="placesGrid" class="places-grid"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="card" style="display: none;">
+      <p class="empty-state">No places found. Try a different category or refresh your location.</p>
+    </div>
+  </div>
+
+  <script>
+    let userLocation = null;
+    let allPlaces = [];
+    let currentCategory = 'all';
+
+    // Predefined places for different cities (fallback data)
+    const fallbackPlaces = {
+      delhi: [
+        { name: 'India Gate', category: 'tourist_attraction', rating: 4.6, description: 'War memorial and iconic landmark', image: '🏛️', distance: '5 km' },
+        { name: 'Red Fort', category: 'tourist_attraction', rating: 4.5, description: 'Historic fortification and UNESCO World Heritage site', image: '🏰', distance: '8 km' },
+        { name: 'Connaught Place', category: 'shopping_mall', rating: 4.4, description: 'Shopping and entertainment hub', image: '🛍️', distance: '3 km' },
+        { name: 'Lodhi Garden', category: 'park', rating: 4.6, description: 'Beautiful garden with historical tombs', image: '🌳', distance: '6 km' },
+        { name: 'Karim\'s', category: 'restaurant', rating: 4.3, description: 'Legendary Mughlai cuisine', image: '🍽️', distance: '7 km' },
+        { name: 'Blue Tokai Coffee', category: 'cafe', rating: 4.5, description: 'Artisanal coffee roasters', image: '☕', distance: '4 km' }
+      ],
+      mumbai: [
+        { name: 'Gateway of India', category: 'tourist_attraction', rating: 4.5, description: 'Iconic arch monument', image: '🏛️', distance: '12 km' },
+        { name: 'Marine Drive', category: 'park', rating: 4.6, description: 'Scenic coastal promenade', image: '🌊', distance: '10 km' },
+        { name: 'Bademiya', category: 'restaurant', rating: 4.4, description: 'Famous street food', image: '🍽️', distance: '11 km' },
+        { name: 'Phoenix Marketcity', category: 'shopping_mall', rating: 4.3, description: 'Premier shopping destination', image: '🛍️', distance: '8 km' },
+        { name: 'Blue Tokai Coffee', category: 'cafe', rating: 4.5, description: 'Specialty coffee', image: '☕', distance: '9 km' },
+        { name: 'Juhu Beach', category: 'park', rating: 4.2, description: 'Popular beach destination', image: '🏖️', distance: '15 km' }
+      ],
+      bangalore: [
+        { name: 'Lalbagh Garden', category: 'park', rating: 4.6, description: 'Historic botanical garden', image: '🌳', distance: '5 km' },
+        { name: 'Cubbon Park', category: 'park', rating: 4.5, description: 'Green oasis in the city', image: '🌲', distance: '3 km' },
+        { name: 'MTR 1924', category: 'restaurant', rating: 4.4, description: 'Authentic South Indian food', image: '🍽️', distance: '4 km' },
+        { name: 'UB City Mall', category: 'shopping_mall', rating: 4.3, description: 'Luxury shopping mall', image: '🛍️', distance: '6 km' },
+        { name: 'Third Wave Coffee', category: 'cafe', rating: 4.5, description: 'Premium coffee roasters', image: '☕', distance: '2 km' },
+        { name: 'Bangalore Palace', category: 'tourist_attraction', rating: 4.4, description: 'Royal palace with Tudor architecture', image: '🏰', distance: '7 km' }
+      ],
+      ghaziabad: [
+        { name: 'Swarna Jayanti Park', category: 'park', rating: 4.3, description: 'Large public park with lake', image: '🌳', distance: '3 km' },
+        { name: 'ISKCON Temple', category: 'tourist_attraction', rating: 4.5, description: 'Beautiful temple complex', image: '🛕', distance: '5 km' },
+        { name: 'Shipra Mall', category: 'shopping_mall', rating: 4.2, description: 'Popular shopping destination', image: '🛍️', distance: '4 km' },
+        { name: 'Barbeque Nation', category: 'restaurant', rating: 4.3, description: 'Live grill restaurant', image: '🍽️', distance: '3 km' },
+        { name: 'Cafe Coffee Day', category: 'cafe', rating: 4.1, description: 'Coffee chain cafe', image: '☕', distance: '2 km' },
+        { name: 'Drizzling Land', category: 'park', rating: 4.0, description: 'Water park and amusement', image: '🎢', distance: '8 km' }
+      ]
+    };
+
+    // Initialize
+    async function init() {
+      await getUserLocation();
+      await loadPlaces();
+    }
+
+    async function getUserLocation() {
+      const locationName = document.getElementById('locationName');
+      const locationDetails = document.getElementById('locationDetails');
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            userLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+            
+            // Reverse geocode to get city name
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
+              .then(res => res.json())
+              .then(data => {
+                const city = data.address.city || data.address.town || data.address.village || 'Your Location';
+                const state = data.address.state || '';
+                locationName.textContent = city;
+                locationDetails.textContent = `${state} • ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`;
+              })
+              .catch(() => {
+                locationName.textContent = 'Location Found';
+                locationDetails.textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`;
+              });
+          },
+          (error) => {
+            locationName.textContent = 'Ghaziabad, Uttar Pradesh';
+            locationDetails.textContent = 'Using default location';
+            userLocation = { lat: 28.6692, lng: 77.4538 }; // Ghaziabad coordinates
+          }
+        );
+      } else {
+        locationName.textContent = 'Ghaziabad, Uttar Pradesh';
+        locationDetails.textContent = 'Geolocation not supported';
+        userLocation = { lat: 28.6692, lng: 77.4538 };
+      }
+    }
+
+    async function loadPlaces() {
+      showLoading(true);
+      
+      // Determine city and load fallback data
+      const locationText = document.getElementById('locationName').textContent.toLowerCase();
+      let cityData = fallbackPlaces.ghaziabad;
+      
+      if (locationText.includes('delhi')) cityData = fallbackPlaces.delhi;
+      else if (locationText.includes('mumbai')) cityData = fallbackPlaces.mumbai;
+      else if (locationText.includes('bangalore') || locationText.includes('bengaluru')) cityData = fallbackPlaces.bangalore;
+      
+      // Shuffle and add some randomization
+      allPlaces = shuffleArray([...cityData]);
+      
+      showLoading(false);
+      renderPlaces();
+    }
+
+    function shuffleArray(array) {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    }
+
+    function filterCategory(category) {
+      currentCategory = category;
+      
+      // Update active button
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.category === category) {
+          btn.classList.add('active');
+        }
+      });
+      
+      renderPlaces();
+    }
+
+    function renderPlaces() {
+      const grid = document.getElementById('placesGrid');
+      const emptyState = document.getElementById('emptyState');
+      
+      let filteredPlaces = currentCategory === 'all' 
+        ? allPlaces 
+        : allPlaces.filter(p => p.category === currentCategory);
+      
+      if (filteredPlaces.length === 0) {
+        grid.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+      }
+      
+      grid.style.display = 'grid';
+      emptyState.style.display = 'none';
+      
+      grid.innerHTML = filteredPlaces.map(place => `
+        <div class="place-card">
+          <div class="place-image">${place.image}</div>
+          <div class="place-content">
+            <h3 class="place-name">${place.name}</h3>
+            <p class="place-description">${place.description}</p>
+            <div class="place-meta">
+              <span class="place-rating">⭐ ${place.rating}</span>
+              <span class="place-distance">📍 ${place.distance}</span>
+            </div>
+            <button onclick="openInMaps('${encodeURIComponent(place.name)}')" class="btn-directions">
+              Get Directions →
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openInMaps(placeName) {
+      const name = decodeURIComponent(placeName);
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
+      window.open(mapsUrl, '_blank');
+    }
+
+    function refreshLocation() {
+      location.reload();
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingState').style.display = show ? 'block' : 'none';
+      document.getElementById('placesGrid').style.display = show ? 'none' : 'grid';
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>

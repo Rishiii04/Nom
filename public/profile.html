@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - Trip Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <div class="navbar-left">
+        <a href="profile.html" class="nav-link">Profile</a>
+        <a href="explore.html" class="nav-link">Explore</a>
+      </div>
+      <div class="navbar-center">
+        <a href="/" class="btn-start-trip">🚀 Start Trip</a>
+      </div>
+      <div class="navbar-right">
+        <a href="trips.html" class="nav-link">My Trips</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>👤 My Profile</h1>
+      <p class="subtitle">Manage your account and preferences</p>
+    </div>
+
+    <!-- Profile Card -->
+    <div class="card profile-header-card">
+      <div class="profile-avatar-section">
+        <div class="profile-avatar" id="profileAvatar">
+          <span id="avatarInitials">U</span>
+        </div>
+        <div class="profile-info">
+          <h2 id="profileName">User</h2>
+          <p id="profileEmail" class="text-muted">user@example.com</p>
+          <div class="profile-badges">
+            <span class="badge badge-primary">Active Traveler</span>
+            <span class="badge badge-success" id="tripCountBadge">0 Trips</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Profile -->
+    <div class="card">
+      <h3>Personal Information</h3>
+      
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="userName" placeholder="Enter your name" />
+      </div>
+
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="userEmail" placeholder="your.email@example.com" />
+      </div>
+
+      <div class="form-group">
+        <label>Phone Number</label>
+        <input type="tel" id="userPhone" placeholder="+91 XXXXX XXXXX" />
+      </div>
+
+      <div class="form-group">
+        <label>UPI ID (for settlements)</label>
+        <input type="text" id="userUpi" placeholder="yourname@paytm" />
+        <small class="form-hint">This will be used for receiving payments in trip settlements</small>
+      </div>
+
+      <button onclick="saveProfile()" class="btn-primary">Save Changes</button>
+    </div>
+
+    <!-- Statistics -->
+    <div class="card">
+      <h3>Your Statistics</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-value" id="totalTrips">0</div>
+          <div class="stat-label">Total Trips</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="totalExpenses">₹0</div>
+          <div class="stat-label">Total Spent</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="settledTrips">0</div>
+          <div class="stat-label">Settled Trips</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="totalFriends">0</div>
+          <div class="stat-label">Travel Buddies</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preferences -->
+    <div class="card">
+      <h3>Preferences</h3>
+      
+      <div class="preference-item">
+        <div class="preference-info">
+          <strong>Email Notifications</strong>
+          <p class="text-muted">Receive updates about trip activities</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="emailNotif" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="preference-item">
+        <div class="preference-info">
+          <strong>Auto-Calculate Settlement</strong>
+          <p class="text-muted">Automatically show settlement when trip is settled</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="autoCalc" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="preference-item">
+        <div class="preference-info">
+          <strong>Default Split Method</strong>
+          <p class="text-muted">How expenses should be split by default</p>
+        </div>
+        <select id="splitMethod" class="preference-select">
+          <option value="equal">Equal Split</option>
+          <option value="custom">Custom Split</option>
+          <option value="percentage">Percentage Split</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="card danger-card">
+      <h3>⚠️ Danger Zone</h3>
+      <p class="text-muted mb-3">These actions are irreversible. Please be careful.</p>
+      
+      <button onclick="clearAllData()" class="btn-danger-outline">
+        Clear All Local Data
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Load profile from localStorage
+    function loadProfile() {
+      const profile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+      
+      // Set default values if not exists
+      if (!profile.name) {
+        profile.name = 'Traveler';
+        profile.email = 'user@example.com';
+        profile.phone = '';
+        profile.upi = '';
+      }
+
+      document.getElementById('userName').value = profile.name || '';
+      document.getElementById('userEmail').value = profile.email || '';
+      document.getElementById('userPhone').value = profile.phone || '';
+      document.getElementById('userUpi').value = profile.upi || '';
+
+      // Update header
+      document.getElementById('profileName').textContent = profile.name;
+      document.getElementById('profileEmail').textContent = profile.email;
+      
+      // Update avatar initials
+      const initials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      document.getElementById('avatarInitials').textContent = initials;
+
+      // Load preferences
+      const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{"emailNotif":true,"autoCalc":true,"splitMethod":"equal"}');
+      document.getElementById('emailNotif').checked = prefs.emailNotif;
+      document.getElementById('autoCalc').checked = prefs.autoCalc;
+      document.getElementById('splitMethod').value = prefs.splitMethod;
+
+      // Load statistics
+      loadStatistics();
+    }
+
+    function saveProfile() {
+      const profile = {
+        name: document.getElementById('userName').value.trim(),
+        email: document.getElementById('userEmail').value.trim(),
+        phone: document.getElementById('userPhone').value.trim(),
+        upi: document.getElementById('userUpi').value.trim()
+      };
+
+      if (!profile.name) {
+        alert('Please enter your name');
+        return;
+      }
+
+      localStorage.setItem('userProfile', JSON.stringify(profile));
+
+      // Save preferences
+      const prefs = {
+        emailNotif: document.getElementById('emailNotif').checked,
+        autoCalc: document.getElementById('autoCalc').checked,
+        splitMethod: document.getElementById('splitMethod').value
+      };
+      localStorage.setItem('userPreferences', JSON.stringify(prefs));
+
+      alert('✅ Profile saved successfully!');
+      loadProfile();
+    }
+
+    async function loadStatistics() {
+      try {
+        // This would fetch from backend in production
+        // For now, using mock data
+        const stats = {
+          totalTrips: 0,
+          totalExpenses: 0,
+          settledTrips: 0,
+          totalFriends: 0
+        };
+
+        document.getElementById('totalTrips').textContent = stats.totalTrips;
+        document.getElementById('totalExpenses').textContent = `₹${stats.totalExpenses}`;
+        document.getElementById('settledTrips').textContent = stats.settledTrips;
+        document.getElementById('totalFriends').textContent = stats.totalFriends;
+        document.getElementById('tripCountBadge').textContent = `${stats.totalTrips} Trips`;
+      } catch (err) {
+        console.error('Failed to load statistics:', err);
+      }
+    }
+
+    function clearAllData() {
+      if (!confirm('⚠️ This will delete all your local data including profile and preferences. Continue?')) {
+        return;
+      }
+
+      if (!confirm('Are you absolutely sure? This cannot be undone!')) {
+        return;
+      }
+
+      localStorage.clear();
+      alert('✅ All data cleared successfully!');
+      location.reload();
+    }
+
+    // Initialize
+    loadProfile();
+  </script>
+</body>
+</html>
