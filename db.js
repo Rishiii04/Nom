@@ -1,7 +1,8 @@
 const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 
-// Use in-memory database for Vercel (serverless compatible)
-const db = new sqlite3.Database(':memory:');
+const DB_PATH = path.join(__dirname, 'expenses.db');
+const db = new sqlite3.Database(DB_PATH);
 
 // Initialize database schema
 function initDatabase() {
@@ -22,6 +23,7 @@ function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         trip_id INTEGER NOT NULL,
         name TEXT NOT NULL,
+        upi_id TEXT,
         FOREIGN KEY (trip_id) REFERENCES trips(id),
         UNIQUE(trip_id, name)
       )
@@ -54,7 +56,16 @@ function initDatabase() {
       )
     `);
 
-    console.log('✓ Database initialized (in-memory for Vercel)');
+    // Migration: Add upi_id column if it doesn't exist (for existing databases)
+    db.run(`
+      ALTER TABLE members ADD COLUMN upi_id TEXT
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Migration error:', err);
+      }
+    });
+
+    console.log('✓ Database initialized');
   });
 }
 
