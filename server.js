@@ -4,7 +4,7 @@ const { initDatabase, runQuery, getQuery, allQuery } = require('./db');
 const { calculateSettlement, formatSettlement } = require('./settlement');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // Middleware
 app.use(express.json());
@@ -12,21 +12,6 @@ app.use(express.static('public'));
 
 // Initialize database
 initDatabase();
-
-// Health check endpoint for Vercel
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
-
-// Root redirect to index.html
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Serve trip page
-app.get('/trip.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'trip.html'));
-});
 
 // ============ API ROUTES ============
 
@@ -43,9 +28,15 @@ app.post('/api/trips', async (req, res) => {
     const trip = await runQuery('INSERT INTO trips (name) VALUES (?)', [name]);
     const tripId = trip.id;
 
-    // Add members
-    for (const memberName of members) {
-      await runQuery('INSERT INTO members (trip_id, name) VALUES (?, ?)', [tripId, memberName]);
+    // Add members (support both string names and objects with {name, upiId})
+    for (const member of members) {
+      const memberName = typeof member === 'string' ? member : member.name;
+      const upiId = typeof member === 'object' ? member.upiId : null;
+      
+      await runQuery(
+        'INSERT INTO members (trip_id, name, upi_id) VALUES (?, ?, ?)', 
+        [tripId, memberName, upiId]
+      );
     }
 
     res.json({ tripId, name });
@@ -182,6 +173,7 @@ app.get('/api/trips/:id/calculate', async (req, res) => {
       return {
         id: member.id,
         name: member.name,
+        upi_id: member.upi_id,
         paid: Math.round(paid * 100) / 100,
         owed: Math.round(owed * 100) / 100,
         balance: result.balances[member.id] || 0
@@ -198,6 +190,108 @@ app.get('/api/trips/:id/calculate', async (req, res) => {
   }
 });
 
+
+// Delete expense
+app.delete('/api/expenses/:id', async (req, res) => {
+  try {
+    const expenseId = req.params.id;
+    
+    // Get trip_id to check if settled
+    const expense = await getQuery('SELECT trip_id FROM expenses WHERE id = ?', [expenseId]);
+    if (!expense) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const trip = await getQuery('SELECT is_settled FROM trips WHERE id = ?', [expense.trip_id]);
+    if (trip.is_settled) {
+      return res.status(400).json({ error: 'Cannot delete expenses from a settled trip' });
+    }
+
+    // Delete expense participants first (foreign key constraint)
+    await runQuery('DELETE FROM expense_participants WHERE expense_id = ?', [expenseId]);
+    
+    // Delete expense
+    await runQuery('DELETE FROM expenses WHERE id = ?', [expenseId]);
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete expense' });
+  }
+});
+
+// Update expense
+app.put('/api/expenses/:id', async (req, res) => {
+  try {
+    const expenseId = req.params.id;
+    const { description, amount, payerId, category, participantIds } = req.body;
+
+    // Validate
+    if (!description || !amount || !payerId || !category || !participantIds || participantIds.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Get trip_id to check if settled
+    const expense = await getQuery('SELECT trip_id FROM expenses WHERE id = ?', [expenseId]);
+    if (!expense) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const trip = await getQuery('SELECT is_settled FROM trips WHERE id = ?', [expense.trip_id]);
+    if (trip.is_settled) {
+      return res.status(400).json({ error: 'Cannot edit expenses in a settled trip' });
+    }
+
+    // Update expense
+    await runQuery(
+      'UPDATE expenses SET description = ?, amount = ?, payer_id = ?, category = ? WHERE id = ?',
+      [description, amount, payerId, category, expenseId]
+    );
+
+    // Delete old participants
+    await runQuery('DELETE FROM expense_participants WHERE expense_id = ?', [expenseId]);
+
+    // Add new participants
+    for (const participantId of participantIds) {
+      await runQuery(
+        'INSERT INTO expense_participants (expense_id, member_id) VALUES (?, ?)',
+        [expenseId, participantId]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update expense' });
+  }
+});
+// Get all trips (for trips page)
+app.get('/api/trips/all', async (req, res) => {
+  try {
+    const trips = await allQuery(`
+      SELECT 
+        t.id,
+        t.name,
+        t.created_at,
+        t.is_settled,
+        COUNT(DISTINCT m.id) as member_count,
+        COUNT(DISTINCT e.id) as expense_count,
+        COALESCE(SUM(e.amount), 0) as total_expenses
+      FROM trips t
+      LEFT JOIN members m ON t.id = m.trip_id
+      LEFT JOIN expenses e ON t.id = e.trip_id
+      GROUP BY t.id
+      ORDER BY t.created_at DESC
+    `);
+    
+    res.json(trips);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch trips' });
+  }
+});
+
+
 // Settle trip (mark as finalized)
 app.post('/api/trips/:id/settle', async (req, res) => {
   try {
@@ -212,14 +306,9 @@ app.post('/api/trips/:id/settle', async (req, res) => {
   }
 });
 
-// Start server (Vercel compatible)
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`\n✓ Server running at http://localhost:${PORT}`);
-    console.log(`✓ Database ready`);
-    console.log(`\n→ Open http://localhost:${PORT} to start\n`);
-  });
-}
-
-// Export for Vercel
-module.exports = app;
+// Start server
+app.listen(PORT, () => {
+  console.log(`\n✓ Server running at http://localhost:${PORT}`);
+  console.log(`✓ Database ready`);
+  console.log(`\n→ Open http://localhost:${PORT} to start\n`);
+});
