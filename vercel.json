@@ -12,19 +12,12 @@
   ],
   "routes": [
     {
-      "src": "/api/.*",
+      "src": "/api/(.*)",
       "dest": "server.js"
-    },
-    {
-      "src": "/.*\\.(html|css|js|png|jpg|svg|ico)",
-      "dest": "public/$0"
     },
     {
       "src": "/(.*)",
       "dest": "public/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
